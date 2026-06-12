@@ -5,10 +5,10 @@ import { ErrorMessage } from '../../components/ErrorMessage';
 import { LoadingState } from '../../components/LoadingState';
 import { PageHeader } from '../../components/PageHeader';
 import { CvTable } from './components/CvTable';
-import { Cv, listCvs, searchCvs } from './cvApi';
+import { CvListItem, listCvs, searchCvs } from './cvApi';
 
 export function CvListPage() {
-  const [cvs, setCvs] = useState<Cv[]>([]);
+  const [cvs, setCvs] = useState<CvListItem[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

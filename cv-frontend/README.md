@@ -23,10 +23,10 @@ The API base URL defaults to:
 http://localhost:8080
 ```
 
-Override it with:
+Override it from the repository root `.env` with:
 
 ```text
-VITE_API_BASE_URL=http://localhost:8080
+VITE_API_BASE_URL=http://localhost:8081/
 ```
 
 ## Authentication Notes

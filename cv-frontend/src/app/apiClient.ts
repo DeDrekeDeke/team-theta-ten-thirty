@@ -1,4 +1,7 @@
 import { getAuthToken, logout } from '../features/auth/authStore';
+import { API_BASE_URL } from './apiConfig';
+
+export { API_BASE_URL } from './apiConfig';
 
 type ApiErrorResponse = {
   message?: string;
@@ -46,9 +49,6 @@ export async function readErrorMessage(response: Response) {
     return text;
   }
 }
-
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
 export async function apiRequest<T>(
   path: string,

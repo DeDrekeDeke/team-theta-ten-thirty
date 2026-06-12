@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
 import { formatDateTime } from '../../../lib/formatters';
-import { Cv } from '../cvApi';
+import { CvListItem } from '../cvApi';
 
 type CvTableProps = {
-  cvs: Cv[];
+  cvs: CvListItem[];
 };
 
 export function CvTable({ cvs }: CvTableProps) {

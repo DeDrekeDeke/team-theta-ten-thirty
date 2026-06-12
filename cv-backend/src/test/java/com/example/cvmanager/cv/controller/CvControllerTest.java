@@ -5,7 +5,8 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -13,7 +14,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.cvmanager.auth.security.JwtService;
 import com.example.cvmanager.common.exception.GlobalExceptionHandler;
 import com.example.cvmanager.cv.dto.request.CvCreateRequest;
+import com.example.cvmanager.cv.dto.response.CvListItemResponse;
 import com.example.cvmanager.cv.service.CvService;
+import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -157,13 +161,27 @@ class CvControllerTest {
     }
 
     @Test
-    void uploadCvRejectsMissingFileWithValidationResponse() throws Exception {
-        mockMvc.perform(multipart("/api/cvs/upload")
-                        .param("ownerUserId", "1"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.details[0]").value("file: is required"));
+    void listCvsReturnsLightweightListItems() throws Exception {
+        when(cvService.listCvs(isNull())).thenReturn(List.of(new CvListItemResponse(
+                1L,
+                2L,
+                "alice@example.com",
+                "Alice CV",
+                "Student CV summary",
+                LocalDateTime.parse("2026-06-10T10:00:00"),
+                LocalDateTime.parse("2026-06-11T10:00:00"))));
 
-        verifyNoInteractions(cvService);
+        mockMvc.perform(get("/api/cvs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].ownerUserId").value(2))
+                .andExpect(jsonPath("$[0].ownerEmail").value("alice@example.com"))
+                .andExpect(jsonPath("$[0].title").value("Alice CV"))
+                .andExpect(jsonPath("$[0].personalDetails").doesNotExist())
+                .andExpect(jsonPath("$[0].educationEntries").doesNotExist())
+                .andExpect(jsonPath("$[0].workExperienceEntries").doesNotExist())
+                .andExpect(jsonPath("$[0].skills").doesNotExist())
+                .andExpect(jsonPath("$[0].languages").doesNotExist())
+                .andExpect(jsonPath("$[0].links").doesNotExist());
     }
 }

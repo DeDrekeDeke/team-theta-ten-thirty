@@ -16,6 +16,7 @@ export function CvDetailPage() {
   const [error, setError] = useState('');
   const [archiving, setArchiving] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -104,14 +105,49 @@ export function CvDetailPage() {
         </div>
         <div className="form-stack">
           <AiActionPanel cvId={cv.id} />
-          <Button type="button" variant="secondary" disabled={archiving} onClick={handleArchive}>
+          <Button type="button" variant="secondary" className="small" disabled={archiving} onClick={handleArchive}>
             {archiving ? 'Archiving...' : 'Archive CV'}
           </Button>
-          <Button type="button" variant="secondary" disabled={removing} onClick={handleSoftDelete}>
-            {removing ? 'Removing...' : 'Remove CV'}
+          <Button
+            type="button"
+            variant="secondary"
+            className="small danger"
+            disabled={removing}
+            onClick={() => setConfirmingRemove(true)}
+          >
+            Remove CV
           </Button>
         </div>
       </div>
+
+      {confirmingRemove ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setConfirmingRemove(false)}>
+          <div
+            className="modal-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="remove-cv-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="form-stack">
+              <div>
+                <h3 id="remove-cv-title">Remove CV?</h3>
+                <p className="muted">
+                  This will hide the CV from all views while keeping the record in the database.
+                </p>
+              </div>
+              <div className="inline-actions end">
+                <Button type="button" variant="secondary" disabled={removing} onClick={() => setConfirmingRemove(false)}>
+                  Cancel
+                </Button>
+                <Button type="button" variant="secondary" className="danger" disabled={removing} onClick={handleSoftDelete}>
+                  {removing ? 'Removing...' : 'Remove CV'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -5,7 +5,7 @@ import { ErrorMessage } from '../../components/ErrorMessage';
 import { LoadingState } from '../../components/LoadingState';
 import { PageHeader } from '../../components/PageHeader';
 import { CvTable } from './components/CvTable';
-import { archiveCv, Cv, listCvs, searchCvs, softDeleteCv } from './cvApi';
+import { CvListItem, archiveCv, Cv, listCvs, searchCvs, softDeleteCv } from './cvApi';
 
 type LocationState = {
   notice?: string;
@@ -14,7 +14,7 @@ type LocationState = {
 export function CvListPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [cvs, setCvs] = useState<Cv[]>([]);
+  const [cvs, setCvs] = useState<CvListItem[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -26,13 +26,15 @@ export function CvListPage() {
       setNotice(state.notice);
       navigate(location.pathname, { replace: true, state: null });
     }
-    loadCvs();
+    loadCvs({ clearNotice: !state?.notice });
   }, []);
 
-  async function loadCvs() {
+  async function loadCvs(options: { clearNotice?: boolean } = {}) {
     setLoading(true);
     setError('');
-    setNotice('');
+    if (options.clearNotice ?? true) {
+      setNotice('');
+    }
     try {
       setCvs(await listCvs());
     } catch (exception) {

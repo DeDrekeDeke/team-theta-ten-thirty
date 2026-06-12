@@ -226,6 +226,22 @@ textarea {
   color: #172026;
 }
 
+.button.small {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+.button.danger {
+  border-color: #b84242;
+  background: #b84242;
+  color: #ffffff;
+}
+
+.button.danger:hover:not(:disabled) {
+  background: #993232;
+}
+
 .button:disabled {
   cursor: not-allowed;
   opacity: 0.65;

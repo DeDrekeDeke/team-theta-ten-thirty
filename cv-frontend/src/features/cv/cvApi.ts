@@ -18,6 +18,16 @@ export type Cv = {
   deletedAt: string | null;
 };
 
+export type CvListItem = {
+  id: number;
+  ownerUserId: number;
+  ownerEmail: string;
+  title: string;
+  summary: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CvPersonalDetails = {
   id?: number;
   fullName: string | null;
@@ -84,7 +94,7 @@ export type CvCreateRequest = {
 };
 
 export function listCvs() {
-  return apiRequest<Cv[]>('/api/cvs');
+  return apiRequest<CvListItem[]>('/api/cvs');
 }
 
 export function listArchivedCvs() {
@@ -92,7 +102,7 @@ export function listArchivedCvs() {
 }
 
 export function searchCvs(query: string) {
-  return apiRequest<Cv[]>(`/api/cvs/search?q=${encodeURIComponent(query)}`);
+  return apiRequest<CvListItem[]>(`/api/cvs/search?q=${encodeURIComponent(query)}`);
 }
 
 export function getCv(id: string) {

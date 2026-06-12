@@ -1,26 +1,32 @@
 package com.example.cvmanager.cv.controller;
 
-import com.example.cvmanager.cv.dto.request.CvCreateRequest;
-import com.example.cvmanager.cv.dto.response.CvResponse;
-import com.example.cvmanager.cv.dto.request.CvUpdateRequest;
-import com.example.cvmanager.auth.security.AuthenticatedUser;
-import com.example.cvmanager.cv.service.CvService;
-import jakarta.validation.Valid;
 import java.util.List;
+
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.cvmanager.auth.security.AuthenticatedUser;
+import com.example.cvmanager.cv.dto.request.CvCreateRequest;
+import com.example.cvmanager.cv.dto.request.CvUpdateRequest;
+import com.example.cvmanager.cv.dto.response.CvListItemResponse;
+import com.example.cvmanager.cv.dto.response.CvResponse;
+import com.example.cvmanager.cv.service.CvService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/cvs")
 public class CvController {
-
-    private static final String CV_HTML_CONTENT_SECURITY_POLICY =
-            "default-src 'none'; img-src data: http: https:; style-src 'unsafe-inline'; font-src data:; sandbox";
-
     private final CvService cvService;
 
     public CvController(CvService cvService) {
@@ -28,7 +34,7 @@ public class CvController {
     }
 
     @GetMapping
-    public List<CvResponse> listCvs(@AuthenticationPrincipal AuthenticatedUser user) {
+    public List<CvListItemResponse> listCvs(@AuthenticationPrincipal AuthenticatedUser user) {
         return cvService.listCvs(user);
     }
 
@@ -38,7 +44,7 @@ public class CvController {
     }
 
     @GetMapping("/search")
-    public List<CvResponse> searchCvs(
+    public List<CvListItemResponse> searchCvs(
             @AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam String q) {
         return cvService.searchCvs(user, q);
@@ -51,41 +57,12 @@ public class CvController {
         return cvService.getCv(user, id);
     }
 
-    // IMPORTANT: functionality no longer supported, methods preserved for documentation purposes.
-    @GetMapping(value = "/{id}/html", produces = MediaType.TEXT_HTML_VALUE)
-    public ResponseEntity<String> getCvHtml(
-            @AuthenticationPrincipal AuthenticatedUser user,
-            @PathVariable Long id) {
-        return ResponseEntity.ok()
-                .contentType(MediaType.TEXT_HTML)
-                .header("Content-Security-Policy", CV_HTML_CONTENT_SECURITY_POLICY)
-                .header("X-Content-Type-Options", "nosniff")
-                .body(cvService.getUploadedHtml(user, id));
-    }
-
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CvResponse createCv(
             @AuthenticationPrincipal AuthenticatedUser user,
             @Valid @RequestBody CvCreateRequest request) {
         return cvService.createCv(user, request);
-    }
-
-    // IMPORTANT: functionality no longer supported, methods preserved for documentation purposes.
-    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @ResponseStatus(HttpStatus.CREATED)
-    public CvResponse uploadCv(
-            @AuthenticationPrincipal AuthenticatedUser user,
-            @RequestParam Long ownerUserId,
-            @RequestParam(required = false) String title,
-            @RequestParam("file") MultipartFile file) {
-        return cvService.uploadHtmlCv(user, ownerUserId, title, file);
-    }
-
-    // Disabled functionality
-    @PostMapping(value = "/legacy-preview", consumes = MediaType.TEXT_PLAIN_VALUE, produces = MediaType.TEXT_HTML_VALUE)
-    public String legacyPreview(@RequestBody String input) {
-        return cvService.buildLegacyPreview(input);
     }
 
     @PutMapping("/{id}")

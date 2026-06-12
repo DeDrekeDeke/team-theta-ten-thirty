@@ -58,10 +58,31 @@ public class CvService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<CvResponse> listArchivedCvs(AuthenticatedUser user) {
+        return getAllArchivedCvsBasedOnPermission(user).stream()
+                .map(cvMapper::toResponse)
+                .toList();
+    }
+
     @Transactional
     public void archiveCv(AuthenticatedUser user, Long id) {
         Cv cv = findAuthorizedCv(user, id);
         cv.archive();
+        cvRepository.save(cv);
+    }
+
+    @Transactional
+    public void unarchiveCv(AuthenticatedUser user, Long id) {
+        Cv cv = findAuthorizedNonDeletedCv(user, id);
+        cv.unarchive();
+        cvRepository.save(cv);
+    }
+
+    @Transactional
+    public void softDeleteCv(AuthenticatedUser user, Long id) {
+        Cv cv = findAuthorizedNonDeletedCv(user, id);
+        cv.softDelete();
         cvRepository.save(cv);
     }
 
@@ -142,6 +163,14 @@ public class CvService {
         return cv;
     }
 
+    @Transactional(readOnly = true)
+    public Cv findAuthorizedNonDeletedCv(AuthenticatedUser user, Long id) {
+        Cv cv = cvRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new NotFoundException("CV not found", "CV_NOT_FOUND"));
+        adminAccessService.requireOwnerOrAdmin(user, cv.getOwner().getId());
+        return cv;
+    }
+
     private String normalizeLegacyText(String value) {
         return value.replace("\r\n", "\n").replace("\r", "\n").trim();
     }
@@ -159,6 +188,17 @@ public class CvService {
 
     private List<Cv> getVisibleCvsForOwner(Long ownerId) {
         return cvRepository.findByOwnerIdAndArchivedAtIsNullAndDeletedAtIsNull(ownerId, updatedAtDescending());
+    }
+
+    private List<Cv> getAllArchivedCvsBasedOnPermission(AuthenticatedUser user) {
+        if (user.admin()) {
+            return cvRepository.findByArchivedAtIsNotNullAndDeletedAtIsNull(updatedAtDescending());
+        }
+        return getArchivedCvsForOwner(user.userId());
+    }
+
+    private List<Cv> getArchivedCvsForOwner(Long ownerId) {
+        return cvRepository.findByOwnerIdAndArchivedAtIsNotNullAndDeletedAtIsNull(ownerId, updatedAtDescending());
     }
 
     private boolean matchesSearch(Cv cv, String query) {

@@ -36,7 +36,8 @@ public class CvMapper {
                 toLinkResponses(cv.getLinks()),
                 cv.getCreatedAt(),
                 cv.getUpdatedAt(),
-                cv.getArchivedAt());
+                cv.getArchivedAt(),
+                cv.getDeletedAt());
     }
 
     private CvPersonalDetailsResponse toPersonalDetailsResponse(CvPersonalDetails personalDetails) {

@@ -17,5 +17,6 @@ public record CvResponse(
         List<CvLinkResponse> links,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
-        LocalDateTime archivedAt) {
+        LocalDateTime archivedAt,
+        LocalDateTime deletedAt) {
 }

@@ -11,6 +11,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { to: '/', label: 'CVs' },
+  { to: '/archived', label: 'Archive' },
   { to: '/create', label: 'Create' },
   { to: '/admin/users', label: 'Users'},
   { to: '/admin/settings', label: 'Settings'}

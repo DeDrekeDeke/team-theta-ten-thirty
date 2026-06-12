@@ -10,12 +10,15 @@ import org.springframework.data.repository.query.Param;
 
 public interface CvRepository extends JpaRepository<Cv, Long> {
 
-    List<Cv> findByOwnerIdAndArchivedAtIsNull(Long ownerId, Sort sort);
+    List<Cv> findByOwnerIdAndArchivedAtIsNullAndDeletedAtIsNull(Long ownerId, Sort sort);
+
+    List<Cv> findByOwnerIdAndArchivedAtIsNotNullAndDeletedAtIsNull(Long ownerId, Sort sort);
 
     @Query("""
             SELECT cv FROM Cv cv
             JOIN cv.owner owner
             WHERE cv.archivedAt IS NULL
+                AND cv.deletedAt IS NULL
                 AND (
                     lower(cv.title) LIKE lower(concat('%', :query, '%'))
                     OR lower(owner.email) LIKE lower(concat('%', :query, '%'))
@@ -29,16 +32,22 @@ public interface CvRepository extends JpaRepository<Cv, Long> {
             SELECT cv FROM Cv cv
             JOIN cv.owner owner
             WHERE cv.archivedAt IS NULL
+                AND cv.deletedAt IS NULL
                 AND cv.owner.id = :ownerId
                 AND (
                     lower(cv.title) LIKE lower(concat('%', :query, '%'))
                     OR lower(owner.email) LIKE lower(concat('%', :query, '%'))
+                    OR lower(cv.summary) LIKE lower(concat('%', :query, '%'))
                 )
             ORDER BY cv.updatedAt DESC
             """)
     List<Cv> searchByOwner(@Param("ownerId") Long ownerId, @Param("query") String query);
 
-    List<Cv> findByArchivedAtIsNull(Sort sort);
+    List<Cv> findByArchivedAtIsNullAndDeletedAtIsNull(Sort sort);
 
-    Optional<Cv> findByIdAndArchivedAtIsNull(Long id);
+    List<Cv> findByArchivedAtIsNotNullAndDeletedAtIsNull(Sort sort);
+
+    Optional<Cv> findByIdAndDeletedAtIsNull(Long id);
+
+    Optional<Cv> findByIdAndArchivedAtIsNullAndDeletedAtIsNull(Long id);
 }

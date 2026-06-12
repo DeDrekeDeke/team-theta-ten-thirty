@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
@@ -43,7 +44,7 @@ class UserServiceTest {
 
     @Test
     void createUserHashesPasswordAndReturnsSafeResponse() {
-        when(userRepository.findByEmailIgnoreCase("carol@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull("carol@example.com")).thenReturn(Optional.empty());
         ArgumentCaptor<UserAccount> userCaptor = ArgumentCaptor.forClass(UserAccount.class);
         when(userRepository.save(userCaptor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -63,12 +64,28 @@ class UserServiceTest {
 
     @Test
     void createUserRejectsDuplicateEmailIgnoringCase() {
-        when(userRepository.findByEmailIgnoreCase("alice@example.com"))
+        when(userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull("alice@example.com"))
                 .thenReturn(Optional.of(new UserAccount("alice@example.com", "Alice Student", "hash", false)));
 
         assertThrows(
                 BadRequestException.class,
                 () -> userService.createUser(new UserCreateRequest("Alice@Example.com", "Alice Student", "user123")));
+    }
+
+    @Test
+    void createUserAllowsEmailWhenOnlyDeletedAccountMatches() {
+        when(userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull("alice@example.com")).thenReturn(Optional.empty());
+        ArgumentCaptor<UserAccount> userCaptor = ArgumentCaptor.forClass(UserAccount.class);
+        when(userRepository.save(userCaptor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = userService.createUser(new UserCreateRequest(
+                "Alice@example.com",
+                "Alice New",
+                "user123"));
+
+        assertEquals("alice@example.com", response.email());
+        assertEquals("Alice New", response.displayName());
+        assertFalse(userCaptor.getValue().isDeleted());
     }
 
     @Test
@@ -81,7 +98,7 @@ class UserServiceTest {
         ReflectionTestUtils.setField(user, "id", 2L);
 
         when(userRepository.findByIdAndDeletedAtIsNull(2L)).thenReturn(Optional.of(user));
-        when(userRepository.findByEmailIgnoreCase("alice.updated@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull("alice.updated@example.com")).thenReturn(Optional.empty());
         ArgumentCaptor<UserAccount> userCaptor = ArgumentCaptor.forClass(UserAccount.class);
         when(userRepository.save(userCaptor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -107,7 +124,7 @@ class UserServiceTest {
         ReflectionTestUtils.setField(admin, "id", 1L);
 
         when(userRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(admin));
-        when(userRepository.findByEmailIgnoreCase("admin@example.com")).thenReturn(Optional.of(admin));
+        when(userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull("admin@example.com")).thenReturn(Optional.of(admin));
 
         assertThrows(
                 BadRequestException.class,
@@ -135,5 +152,25 @@ class UserServiceTest {
 
         assertNotNull(userCaptor.getValue().getDeletedAt());
         verify(cvRepository).markDeletedByOwnerId(2L, userCaptor.getValue().getDeletedAt());
+    }
+
+    @Test
+    void softDeleteOwnAccountRejectsLastActiveAdmin() {
+        UserAccount admin = new UserAccount(
+                "admin@example.com",
+                "Admin User",
+                passwordEncoder.encode("admin123"),
+                true);
+        ReflectionTestUtils.setField(admin, "id", 1L);
+
+        when(userRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(admin));
+        when(userRepository.countByRoleAndDeletedAtIsNull(admin.getRole())).thenReturn(1L);
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> userService.softDeleteOwnAccount(1L));
+
+        assertEquals("USER_LAST_ADMIN", exception.getCode());
+        verifyNoInteractions(cvRepository);
     }
 }

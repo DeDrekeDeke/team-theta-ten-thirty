@@ -9,8 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepository extends JpaRepository<UserAccount, Long> {
 
-    Optional<UserAccount> findByEmailIgnoreCase(String email);
-
     Optional<UserAccount> findByEmailIgnoreCaseAndDeletedAtIsNull(String email);
 
     Optional<UserAccount> findByIdAndDeletedAtIsNull(Long id);

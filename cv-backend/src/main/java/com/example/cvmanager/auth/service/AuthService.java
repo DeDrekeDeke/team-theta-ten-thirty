@@ -48,7 +48,7 @@ public class AuthService {
     public LoginResponse register(UserCreateRequest request) {
         String email = request.email().trim().toLowerCase(Locale.ROOT);
 
-        userRepository.findByEmailIgnoreCase(email).ifPresent(existing -> {
+        userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull(email).ifPresent(existing -> {
             throw new BadRequestException("User with this email already exists", "USER_EMAIL_EXISTS");
         });
 

@@ -134,6 +134,7 @@ public class UserService {
 
     private void softDeleteUserById(Long id) {
         UserAccount user = findActiveUser(id);
+        ensureAnAdminRemainsAfterDelete(user);
         LocalDateTime deletedAt = LocalDateTime.now();
         cvRepository.markDeletedByOwnerId(user.getId(), deletedAt);
         user.markDeleted(deletedAt);
@@ -146,7 +147,7 @@ public class UserService {
     }
 
     private void ensureEmailAvailable(String email, Long currentUserId) {
-        userRepository.findByEmailIgnoreCase(email)
+        userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull(email)
                 .filter(existing -> currentUserId == null || !existing.getId().equals(currentUserId))
                 .ifPresent(existing -> {
                     throw new BadRequestException("User with this email already exists", "USER_EMAIL_EXISTS");
@@ -157,6 +158,12 @@ public class UserService {
         if (user.isAdmin()
                 && requestedRole != UserRole.ADMIN
                 && userRepository.countByRoleAndDeletedAtIsNull(UserRole.ADMIN) <= 1) {
+            throw new BadRequestException("At least one admin user is required", "USER_LAST_ADMIN");
+        }
+    }
+
+    private void ensureAnAdminRemainsAfterDelete(UserAccount user) {
+        if (user.isAdmin() && userRepository.countByRoleAndDeletedAtIsNull(UserRole.ADMIN) <= 1) {
             throw new BadRequestException("At least one admin user is required", "USER_LAST_ADMIN");
         }
     }

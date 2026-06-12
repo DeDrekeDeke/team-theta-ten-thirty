@@ -62,3 +62,9 @@ export function updateUser(id: number, request: UserUpdateRequest) {
     body: JSON.stringify(request)
   });
 }
+
+export function deleteUser(id: number) {
+  return apiRequest<void>(`/api/users/${id}`, {
+    method: 'DELETE'
+  });
+}

@@ -226,6 +226,11 @@ textarea {
   color: #172026;
 }
 
+.button.danger {
+  background: #a33232;
+  color: #ffffff;
+}
+
 .button:disabled {
   cursor: not-allowed;
   opacity: 0.65;
@@ -429,6 +434,27 @@ tr:last-child td {
   display: grid;
   align-content: start;
   gap: 12px;
+}
+
+.account-summary {
+  display: grid;
+  gap: 14px;
+}
+
+.account-summary div {
+  display: grid;
+  gap: 4px;
+}
+
+.danger-zone {
+  display: grid;
+  gap: 14px;
+  border-color: #d7a4a4;
+}
+
+.danger-zone h3,
+.danger-zone p {
+  margin: 0;
 }
 
 .error-message {

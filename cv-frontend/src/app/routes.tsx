@@ -9,6 +9,7 @@ import { CvEditPage } from '../features/cv/CvEditPage';
 import { CvListPage } from '../features/cv/CvListPage';
 import { SettingsPage } from '../features/admin/SettingsPage';
 import { UsersPage } from '../features/admin/UsersPage';
+import { AccountSettingsPage } from '../features/account/AccountSettingsPage';
 
 export const router = createBrowserRouter([
   {
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       { path: 'create', element: <ProtectedRoute><CvCreatePage /></ProtectedRoute> },
+      { path: 'settings', element: <ProtectedRoute><AccountSettingsPage /></ProtectedRoute> },
       { path: 'cvs/:id/edit', element: <ProtectedRoute><CvEditPage /></ProtectedRoute> },
       { path: 'cvs/:id', element: <ProtectedRoute><CvDetailPage /></ProtectedRoute> },
       { path: 'admin/users', element: <ProtectedRoute requireAdmin><UsersPage /></ProtectedRoute>},

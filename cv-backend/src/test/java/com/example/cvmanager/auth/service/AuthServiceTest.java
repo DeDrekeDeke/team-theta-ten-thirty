@@ -46,7 +46,7 @@ class AuthServiceTest {
                 passwordEncoder.encode("user123"),
                 false);
 
-        when(userRepository.findByEmailIgnoreCase("alice@example.com"))
+        when(userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull("alice@example.com"))
                 .thenReturn(Optional.of(user));
 
         var response = authService.login(new LoginRequest("alice@example.com", "user123"));
@@ -66,7 +66,7 @@ class AuthServiceTest {
                 passwordEncoder.encode("user123"),
                 false);
 
-        when(userRepository.findByEmailIgnoreCase("alice@example.com"))
+        when(userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull("alice@example.com"))
                 .thenReturn(Optional.of(user));
 
         assertThrows(

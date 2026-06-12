@@ -1,12 +1,13 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { ErrorMessage } from '../../components/ErrorMessage';
 import { FormField, TextInput } from '../../components/FormField';
 import { LoadingState } from '../../components/LoadingState';
 import { PageHeader } from '../../components/PageHeader';
 import { formatDateTime } from '../../lib/formatters';
-import { getCurrentUser } from '../auth/authStore';
-import { AdminUser, createUser, listUsers, updateUser } from './adminApi';
+import { getCurrentUser, logout } from '../auth/authStore';
+import { AdminUser, createUser, deleteUser, listUsers, updateUser } from './adminApi';
 
 const emptyForm = {
   email: '',
@@ -22,6 +23,7 @@ const emptyEditForm = {
 };
 
 export function UsersPage() {
+  const navigate = useNavigate();
   const currentUser = getCurrentUser();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [form, setForm] = useState(emptyForm);
@@ -30,6 +32,7 @@ export function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const editingOwnAccount = Boolean(editingUser && currentUser?.userId === editingUser.id);
@@ -118,6 +121,36 @@ export function UsersPage() {
     }
   }
 
+  async function handleDeleteUser(user: AdminUser) {
+    const confirmed = window.confirm(`Delete ${user.email}? Their CVs will be hidden too.`);
+    if (!confirmed) {
+      return;
+    }
+
+    let deletedOwnAccount = false;
+    setError('');
+    setNotice('');
+    setDeletingUserId(user.id);
+
+    try {
+      await deleteUser(user.id);
+      deletedOwnAccount = currentUser?.userId === user.id;
+      setUsers((current) => current.filter((item) => item.id !== user.id));
+      if (!deletedOwnAccount) {
+        setNotice(`${user.email} was deleted.`);
+      }
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'Could not delete user');
+    } finally {
+      setDeletingUserId(null);
+    }
+
+    if (deletedOwnAccount) {
+      logout('Your account was deleted.');
+      navigate('/login', { replace: true });
+    }
+  }
+
   return (
     <section className="page-section">
       <PageHeader title="Users" description="Create users and manage basic admin access." />
@@ -191,6 +224,14 @@ export function UsersPage() {
                     <div className="row-actions">
                       <Button type="button" variant="secondary" onClick={() => openEditModal(user)}>
                         Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        disabled={deletingUserId === user.id}
+                        onClick={() => handleDeleteUser(user)}
+                      >
+                        {deletingUserId === user.id ? 'Deleting...' : 'Delete'}
                       </Button>
                     </div>
                   </td>

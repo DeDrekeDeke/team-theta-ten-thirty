@@ -2,12 +2,14 @@ package com.example.cvmanager.user.service;
 
 import com.example.cvmanager.common.exception.BadRequestException;
 import com.example.cvmanager.common.exception.NotFoundException;
+import com.example.cvmanager.cv.repository.CvRepository;
 import com.example.cvmanager.user.dto.UserCreateRequest;
 import com.example.cvmanager.user.dto.UserResponse;
 import com.example.cvmanager.user.dto.UserUpdateRequest;
 import com.example.cvmanager.user.model.UserAccount;
 import com.example.cvmanager.user.model.UserRole;
 import com.example.cvmanager.user.repository.UserRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.data.domain.Sort;
@@ -19,10 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final CvRepository cvRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, CvRepository cvRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.cvRepository = cvRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -33,7 +37,7 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public List<UserResponse> listUsers() {
-        return userRepository.findAll(Sort.by("id")).stream()
+        return userRepository.findByDeletedAtIsNull(Sort.by("id")).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -66,9 +70,7 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public UserResponse getUser(Long id) {
-        return userRepository.findById(id)
-                .map(this::toResponse)
-                .orElseThrow(() -> new NotFoundException("User not found", "USER_NOT_FOUND"));
+        return toResponse(findActiveUser(id));
     }
 
     /**
@@ -93,8 +95,7 @@ public class UserService {
      */
     @Transactional
     public UserResponse updateUser(Long id, UserUpdateRequest request, Long currentUserId) {
-        UserAccount user = userRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("User not found", "USER_NOT_FOUND"));
+        UserAccount user = findActiveUser(id);
 
         String email = normalizeEmail(request.email());
         ensureEmailAvailable(email, id);
@@ -111,6 +112,39 @@ public class UserService {
         return toResponse(userRepository.save(user));
     }
 
+    /**
+     * Soft-deletes an active user and all CVs owned by that user in one transaction.
+     *
+     * @param id user id to soft-delete
+     */
+    @Transactional
+    public void softDeleteUser(Long id) {
+        softDeleteUserById(id);
+    }
+
+    /**
+     * Soft-deletes the authenticated user's own account.
+     *
+     * @param currentUserId authenticated user id
+     */
+    @Transactional
+    public void softDeleteOwnAccount(Long currentUserId) {
+        softDeleteUserById(currentUserId);
+    }
+
+    private void softDeleteUserById(Long id) {
+        UserAccount user = findActiveUser(id);
+        LocalDateTime deletedAt = LocalDateTime.now();
+        cvRepository.markDeletedByOwnerId(user.getId(), deletedAt);
+        user.markDeleted(deletedAt);
+        userRepository.save(user);
+    }
+
+    private UserAccount findActiveUser(Long id) {
+        return userRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new NotFoundException("User not found", "USER_NOT_FOUND"));
+    }
+
     private void ensureEmailAvailable(String email, Long currentUserId) {
         userRepository.findByEmailIgnoreCase(email)
                 .filter(existing -> currentUserId == null || !existing.getId().equals(currentUserId))
@@ -120,13 +154,18 @@ public class UserService {
     }
 
     private void ensureAnAdminRemains(UserAccount user, UserRole requestedRole) {
-        if (user.isAdmin() && requestedRole != UserRole.ADMIN && userRepository.countByRole(UserRole.ADMIN) <= 1) {
+        if (user.isAdmin()
+                && requestedRole != UserRole.ADMIN
+                && userRepository.countByRoleAndDeletedAtIsNull(UserRole.ADMIN) <= 1) {
             throw new BadRequestException("At least one admin user is required", "USER_LAST_ADMIN");
         }
     }
 
     private void ensureNotDemotingSelf(UserAccount user, UserRole requestedRole, Long currentUserId) {
-        if (currentUserId != null && user.getId().equals(currentUserId) && user.isAdmin() && requestedRole != UserRole.ADMIN) {
+        if (currentUserId != null
+                && user.getId().equals(currentUserId)
+                && user.isAdmin()
+                && requestedRole != UserRole.ADMIN) {
             throw new BadRequestException("Admins cannot remove their own admin access", "USER_SELF_DEMOTION");
         }
     }

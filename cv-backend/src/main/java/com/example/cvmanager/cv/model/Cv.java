@@ -45,6 +45,9 @@ public class Cv {
     @Column(name = "archived_at")
     private LocalDateTime archivedAt;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @OneToOne(mappedBy = "cv", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private CvPersonalDetails personalDetails;
 
@@ -103,7 +106,15 @@ public class Cv {
         archivedAt = null;
     }
 
+    public void markDeleted(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
     public boolean isArchived() {
         return archivedAt != null;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 }

@@ -33,7 +33,7 @@ public class AuthService {
     public LoginResponse login(LoginRequest request) {
         String normalizedEmail = request.email().trim().toLowerCase(Locale.ROOT);
 
-        var user = userRepository.findByEmailIgnoreCase(normalizedEmail)
+        var user = userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull(normalizedEmail)
                 .orElseThrow(() -> new BadRequestException("Invalid email or password", "AUTH_INVALID"));
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {

@@ -2,10 +2,12 @@ package com.example.cvmanager.user.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
@@ -18,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.example.cvmanager.common.exception.BadRequestException;
+import com.example.cvmanager.cv.repository.CvRepository;
 import com.example.cvmanager.user.dto.UserCreateRequest;
 import com.example.cvmanager.user.dto.UserUpdateRequest;
 import com.example.cvmanager.user.model.UserAccount;
@@ -26,14 +29,16 @@ import com.example.cvmanager.user.repository.UserRepository;
 class UserServiceTest {
 
     private UserRepository userRepository;
+    private CvRepository cvRepository;
     private PasswordEncoder passwordEncoder;
     private UserService userService;
 
     @BeforeEach
     void setUp() {
         userRepository = mock(UserRepository.class);
+        cvRepository = mock(CvRepository.class);
         passwordEncoder = new BCryptPasswordEncoder();
-        userService = new UserService(userRepository, passwordEncoder);
+        userService = new UserService(userRepository, cvRepository, passwordEncoder);
     }
 
     @Test
@@ -75,7 +80,7 @@ class UserServiceTest {
                 false);
         ReflectionTestUtils.setField(user, "id", 2L);
 
-        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdAndDeletedAtIsNull(2L)).thenReturn(Optional.of(user));
         when(userRepository.findByEmailIgnoreCase("alice.updated@example.com")).thenReturn(Optional.empty());
         ArgumentCaptor<UserAccount> userCaptor = ArgumentCaptor.forClass(UserAccount.class);
         when(userRepository.save(userCaptor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -101,7 +106,7 @@ class UserServiceTest {
                 true);
         ReflectionTestUtils.setField(admin, "id", 1L);
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(userRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(admin));
         when(userRepository.findByEmailIgnoreCase("admin@example.com")).thenReturn(Optional.of(admin));
 
         assertThrows(
@@ -111,5 +116,24 @@ class UserServiceTest {
                         "Admin User",
                         null,
                         "USER"), 1L));
+    }
+
+    @Test
+    void softDeleteUserMarksAccountAndOwnedCvsWithSameTimestamp() {
+        UserAccount user = new UserAccount(
+                "alice@example.com",
+                "Alice Student",
+                passwordEncoder.encode("user123"),
+                false);
+        ReflectionTestUtils.setField(user, "id", 2L);
+
+        when(userRepository.findByIdAndDeletedAtIsNull(2L)).thenReturn(Optional.of(user));
+        ArgumentCaptor<UserAccount> userCaptor = ArgumentCaptor.forClass(UserAccount.class);
+        when(userRepository.save(userCaptor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        userService.softDeleteUser(2L);
+
+        assertNotNull(userCaptor.getValue().getDeletedAt());
+        verify(cvRepository).markDeletedByOwnerId(2L, userCaptor.getValue().getDeletedAt());
     }
 }

@@ -85,7 +85,7 @@ public class CvService {
     @Transactional
     public CvResponse createCv(AuthenticatedUser user, CvCreateRequest request) {
         adminAccessService.requireOwnerOrAdmin(user, request.ownerUserId());
-        var owner = userRepository.findById(request.ownerUserId())
+        var owner = userRepository.findByIdAndDeletedAtIsNull(request.ownerUserId())
                 .orElseThrow(() -> new NotFoundException("Owner user not found", "USER_NOT_FOUND"));
 
         Cv cv = new Cv(owner, request.title());
@@ -131,7 +131,7 @@ public class CvService {
 
     @Transactional(readOnly = true)
     public Cv findCv(Long id) {
-        return cvRepository.findByIdAndArchivedAtIsNull(id)
+        return cvRepository.findByIdAndArchivedAtIsNullAndDeletedAtIsNullAndOwnerDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("CV not found", "CV_NOT_FOUND"));
     }
 
@@ -152,13 +152,13 @@ public class CvService {
 
     private List<Cv> getAllVisibleCvsBasedOnPermission(AuthenticatedUser user) {
         if (user.admin()) {
-            return cvRepository.findByArchivedAtIsNull(updatedAtDescending());
+            return cvRepository.findByArchivedAtIsNullAndDeletedAtIsNullAndOwnerDeletedAtIsNull(updatedAtDescending());
         }
         return getVisibleCvsForOwner(user.userId());
     }
 
     private List<Cv> getVisibleCvsForOwner(Long ownerId) {
-        return cvRepository.findByOwnerIdAndArchivedAtIsNull(ownerId, updatedAtDescending());
+        return cvRepository.findByOwnerIdAndArchivedAtIsNullAndDeletedAtIsNullAndOwnerDeletedAtIsNull(ownerId, updatedAtDescending());
     }
 
     private boolean matchesSearch(Cv cv, String query) {

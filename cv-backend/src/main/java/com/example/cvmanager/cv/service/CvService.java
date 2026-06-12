@@ -1,64 +1,52 @@
 package com.example.cvmanager.cv.service;
 
-import com.example.cvmanager.auth.security.AuthenticatedUser;
-import com.example.cvmanager.common.exception.BadRequestException;
-import com.example.cvmanager.common.exception.NotFoundException;
-import com.example.cvmanager.common.security.AdminAccessService;
-import com.example.cvmanager.cv.dto.CvCreateRequest;
-import com.example.cvmanager.cv.dto.CvResponse;
-import com.example.cvmanager.cv.dto.CvUpdateRequest;
-import com.example.cvmanager.cv.mapper.CvMapper;
-import com.example.cvmanager.cv.model.Cv;
-import com.example.cvmanager.cv.repository.CvRepository;
-import com.example.cvmanager.user.repository.UserRepository;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Locale;
-import java.util.regex.Pattern;
-import org.springframework.data.domain.Sort;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
+
+import com.example.cvmanager.auth.security.AuthenticatedUser;
+import com.example.cvmanager.common.exception.NotFoundException;
+import com.example.cvmanager.common.security.AdminAccessService;
+import com.example.cvmanager.cv.dto.request.CvCreateRequest;
+import com.example.cvmanager.cv.dto.request.CvEducationEntryRequest;
+import com.example.cvmanager.cv.dto.request.CvLanguageRequest;
+import com.example.cvmanager.cv.dto.request.CvLinkRequest;
+import com.example.cvmanager.cv.dto.request.CvPersonalDetailsRequest;
+import com.example.cvmanager.cv.dto.request.CvSkillRequest;
+import com.example.cvmanager.cv.dto.request.CvUpdateRequest;
+import com.example.cvmanager.cv.dto.request.CvWorkExperienceEntryRequest;
+import com.example.cvmanager.cv.dto.response.CvListItemResponse;
+import com.example.cvmanager.cv.dto.response.CvResponse;
+import com.example.cvmanager.cv.mapper.CvMapper;
+import com.example.cvmanager.cv.model.Cv;
+import com.example.cvmanager.cv.model.CvEducationEntry;
+import com.example.cvmanager.cv.model.CvLanguage;
+import com.example.cvmanager.cv.model.CvLink;
+import com.example.cvmanager.cv.model.CvPersonalDetails;
+import com.example.cvmanager.cv.model.CvSkill;
+import com.example.cvmanager.cv.model.CvWorkExperienceEntry;
+import com.example.cvmanager.cv.repository.CvRepository;
+import com.example.cvmanager.user.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class CvService {
 
     private final CvRepository cvRepository;
     private final UserRepository userRepository;
     private final CvMapper cvMapper;
-    private final CvStorageProperties storageProperties;
     private final AdminAccessService adminAccessService;
 
-    private static final int MAX_TITLE_LENGTH = 255;
-    private static final long MAX_HTML_UPLOAD_BYTES = 1_000_000;
-    private static final Pattern UNSAFE_HTML_PATTERN = Pattern.compile(
-            "(?is)<\\s*(script|iframe|object|embed|base|form|input|button|textarea|select|option|meta|link)\\b"
-                    + "|\\son[a-z0-9_-]+\\s*="
-                    + "|\\ssrcdoc\\s*="
-                    + "|(?:href|src|xlink:href)\\s*=\\s*(['\"]?)\\s*(javascript:|data:text/html|vbscript:)");
-
-    public CvService(
-            CvRepository cvRepository,
-            UserRepository userRepository,
-            CvMapper cvMapper,
-            CvStorageProperties storageProperties,
-            AdminAccessService adminAccessService) {
-        this.cvRepository = cvRepository;
-        this.userRepository = userRepository;
-        this.cvMapper = cvMapper;
-        this.storageProperties = storageProperties;
-        this.adminAccessService = adminAccessService;
-    }
-
     @Transactional(readOnly = true)
-    public List<CvResponse> listCvs(AuthenticatedUser user) {
-        return visibleCvs(user).stream()
-                .map(cvMapper::toResponse)
-                .toList();
+    public List<CvListItemResponse> listCvs(AuthenticatedUser user) {
+        if (user.admin()) {
+            return cvRepository.findActiveListItems();
+        }
+
+        return cvRepository.findActiveListItemsByOwner(user.userId());
     }
 
     @Transactional
@@ -74,14 +62,16 @@ public class CvService {
     }
 
     @Transactional(readOnly = true)
-    public List<CvResponse> searchCvs(AuthenticatedUser user, String q) {
+    public List<CvListItemResponse> searchCvs(AuthenticatedUser user, String q) {
         if (q == null || q.isBlank()) {
             return listCvs(user);
         }
 
-        return searchVisibleCvs(user, q.trim()).stream()
-                .map(cvMapper::toResponse)
-                .toList();
+        String query = q.trim();
+        if (user.admin()) {
+            return cvRepository.searchActiveListItems(query);
+        }
+        return cvRepository.searchActiveListItemsByOwner(user.userId(), query);
     }
 
     @Transactional
@@ -90,7 +80,10 @@ public class CvService {
         var owner = userRepository.findById(request.ownerUserId())
                 .orElseThrow(() -> new NotFoundException("Owner user not found", "USER_NOT_FOUND"));
 
-        Cv cv = new Cv(owner, request.title(), request.uploadedHtmlFilePath());
+        Cv cv = new Cv(owner, request.title());
+        cv.setSummary(request.summary());
+        applyStructuredFields(cv, request.personalDetails(), request.educationEntries(), request.workExperienceEntries(),
+                request.skills(), request.languages(), request.links());
         return cvMapper.toResponse(cvRepository.save(cv));
     }
 
@@ -98,116 +91,10 @@ public class CvService {
     public CvResponse updateCv(AuthenticatedUser user, Long id, CvUpdateRequest request) {
         Cv cv = findAuthorizedCv(user, id);
         cv.setTitle(request.title());
-        cv.setUploadedHtmlFilePath(request.uploadedHtmlFilePath());
+        cv.setSummary(request.summary());
+        applyStructuredFields(cv, request.personalDetails(), request.educationEntries(), request.workExperienceEntries(),
+                request.skills(), request.languages(), request.links());
         return cvMapper.toResponse(cvRepository.save(cv));
-    }
-
-    @Transactional
-    public CvResponse uploadHtmlCv(AuthenticatedUser user, Long ownerUserId, String submittedTitle, MultipartFile file) {
-        String title = submittedTitle;
-        MultipartFile upload = file;
-        Long ownerId = ownerUserId;
-        if (ownerId == null) {
-            throw new BadRequestException("Owner user is required", "OWNER_REQUIRED");
-        }
-        if (ownerId <= 0) {
-            throw new BadRequestException("Owner user id must be positive", "OWNER_INVALID");
-        }
-        adminAccessService.requireOwnerOrAdmin(user, ownerId);
-        if (upload == null || upload.isEmpty()) {
-            throw new BadRequestException("HTML file is required", "CV_FILE_REQUIRED");
-        }
-        if (upload.getSize() > MAX_HTML_UPLOAD_BYTES) {
-            throw new BadRequestException("HTML file is too large", "CV_FILE_TOO_LARGE");
-        }
-        String original = upload.getOriginalFilename();
-        String contentType = upload.getContentType();
-        boolean looksHtml = false;
-        if (original != null && original.toLowerCase(Locale.ROOT).endsWith(".html")) {
-            looksHtml = true;
-        }
-        if (original != null && original.toLowerCase(Locale.ROOT).endsWith(".htm")) {
-            looksHtml = true;
-        }
-        if (contentType != null && contentType.toLowerCase(Locale.ROOT).contains("html")) {
-            looksHtml = true;
-        }
-        if (!looksHtml) {
-            throw new BadRequestException("Only HTML files are accepted", "CV_FILE_TYPE");
-        }
-        var owner = userRepository.findById(ownerId)
-                .orElseThrow(() -> new NotFoundException("Owner user not found", "USER_NOT_FOUND"));
-        try {
-            byte[] rawBytes = upload.getBytes();
-            String html = new String(rawBytes, StandardCharsets.UTF_8);
-            rejectUnsafeHtml(html);
-            if (title == null || title.isBlank()) {
-                String lower = html.toLowerCase(Locale.ROOT);
-                int start = lower.indexOf("<title>");
-                int end = lower.indexOf("</title>");
-                if (start >= 0 && end > start) {
-                    title = html.substring(start + 7, end).trim();
-                }
-                if (title == null || title.isBlank()) {
-                    title = original;
-                }
-                if (title == null || title.isBlank()) {
-                    title = "Uploaded CV";
-                }
-            }
-            title = title.trim();
-            if (title.length() > MAX_TITLE_LENGTH) {
-                throw new BadRequestException(
-                    "CV title must be 255 characters or fewer",
-                    "CV_TITLE_TOO_LONG"
-                );
-            }
-            String cleaned = original == null ? "cv.html" : original;
-            cleaned = cleaned.replace("\\", "/");
-            int slash = cleaned.lastIndexOf('/');
-            if (slash >= 0) {
-                cleaned = cleaned.substring(slash + 1);
-            }
-            cleaned = cleaned.replaceAll("[^a-zA-Z0-9._-]", "_");
-            if (cleaned.isBlank()) {
-                cleaned = "cv.html";
-            }
-            String stamp = LocalDateTime.now()
-                    .toString()
-                    .replace(":", "")
-                    .replace(".", "")
-                    .replace("-", "")
-                    .replace("T", "-");
-            Path dir = Path.of(storageProperties.uploadDir());
-            Files.createDirectories(dir);
-            Path target = dir.resolve(ownerId + "-" + stamp + "-" + cleaned);
-            Files.writeString(target, html, StandardCharsets.UTF_8);
-            Cv cv = new Cv(owner, title, target.toString().replace("\\", "/"));
-            Cv saved = cvRepository.save(cv);
-            return cvMapper.toResponse(saved);
-        } catch (IOException exception) {
-            throw new BadRequestException("Could not save uploaded CV", "CV_UPLOAD_FAILED");
-        }
-    }
-
-    @Transactional(readOnly = true)
-    public String getUploadedHtml(AuthenticatedUser user, Long id) {
-        Cv cv = findAuthorizedCv(user, id);
-        Path path = Path.of(cv.getUploadedHtmlFilePath());
-        try {
-            return Files.readString(path, StandardCharsets.UTF_8);
-        } catch (IOException exception) {
-            throw new NotFoundException("Uploaded CV file not found", "CV_FILE_NOT_FOUND");
-        }
-    }
-
-    public String buildLegacyPreview(String input) {
-        String value = input == null ? "" : input;
-        String normalized = normalizeLegacyText(value);
-        String withoutHeader = removeLegacyHeader(normalized);
-        String name = escapeHtml(guessLegacyName(withoutHeader));
-        String body = convertLegacyLines(escapeHtml(withoutHeader));
-        return "<html><body><h1>" + name + "</h1><div>" + body + "</div></body></html>";
     }
 
     @Transactional(readOnly = true)
@@ -223,59 +110,102 @@ public class CvService {
         return cv;
     }
 
-    private String normalizeLegacyText(String value) {
-        return value.replace("\r\n", "\n").replace("\r", "\n").trim();
-    }
-
-    private Sort updatedAtDescending() {
-        return Sort.by(Sort.Direction.DESC, "updatedAt");
-    }
-
-    private List<Cv> visibleCvs(AuthenticatedUser user) {
-        if (user.admin()) {
-            return cvRepository.findByArchivedAtIsNull(updatedAtDescending());
+    private void applyStructuredFields(
+            Cv cv,
+            CvPersonalDetailsRequest personalDetails,
+            List<CvEducationEntryRequest> educationEntries,
+            List<CvWorkExperienceEntryRequest> workExperienceEntries,
+            List<CvSkillRequest> skills,
+            List<CvLanguageRequest> languages,
+            List<CvLinkRequest> links) {
+        if (personalDetails != null) {
+            applyPersonalDetails(cv, personalDetails);
         }
-        return cvRepository.findByOwnerIdAndArchivedAtIsNull(user.userId(), updatedAtDescending());
-    }
-
-    private List<Cv> searchVisibleCvs(AuthenticatedUser user, String query) {
-        if (user.admin()) {
-            return cvRepository.search(query);
+        if (educationEntries != null) {
+            replaceEducationEntries(cv, educationEntries);
         }
-        return cvRepository.searchByOwner(user.userId(), query);
-    }
-
-    private void rejectUnsafeHtml(String html) {
-        if (UNSAFE_HTML_PATTERN.matcher(html).find()) {
-            throw new BadRequestException("HTML file contains unsafe content", "CV_FILE_UNSAFE");
+        if (workExperienceEntries != null) {
+            replaceWorkExperienceEntries(cv, workExperienceEntries);
+        }
+        if (skills != null) {
+            replaceSkills(cv, skills);
+        }
+        if (languages != null) {
+            replaceLanguages(cv, languages);
+        }
+        if (links != null) {
+            replaceLinks(cv, links);
         }
     }
 
-    private String removeLegacyHeader(String value) {
-        if (value.startsWith("CV:")) {
-            return value.substring(3).trim();
+    private void applyPersonalDetails(Cv cv, CvPersonalDetailsRequest request) {
+        CvPersonalDetails personalDetails = cv.getPersonalDetails();
+        if (personalDetails == null) {
+            personalDetails = new CvPersonalDetails(cv);
+            cv.setPersonalDetails(personalDetails);
         }
-        return value;
+
+        personalDetails.setFullName(request.fullName());
+        personalDetails.setEmail(request.email());
+        personalDetails.setPhone(request.phone());
+        personalDetails.setLocation(request.location());
+        personalDetails.setHeadline(request.headline());
     }
 
-    private String guessLegacyName(String value) {
-        String[] lines = value.split("\n");
-        if (lines.length > 0 && !lines[0].isBlank()) {
-            return lines[0].trim();
+    private void replaceEducationEntries(Cv cv, List<CvEducationEntryRequest> requests) {
+        cv.getEducationEntries().clear();
+        for (CvEducationEntryRequest request : requests) {
+            CvEducationEntry entry = new CvEducationEntry(cv, request.institution());
+            entry.setDegree(request.degree());
+            entry.setFieldOfStudy(request.fieldOfStudy());
+            entry.setStartDate(request.startDate());
+            entry.setEndDate(request.endDate());
+            entry.setDescription(request.description());
+            entry.setDisplayOrder(request.displayOrder());
+            cv.getEducationEntries().add(entry);
         }
-        return "Legacy CV";
     }
 
-    private String convertLegacyLines(String value) {
-        return value.replace("\n", "<br>");
+    private void replaceWorkExperienceEntries(Cv cv, List<CvWorkExperienceEntryRequest> requests) {
+        cv.getWorkExperienceEntries().clear();
+        for (CvWorkExperienceEntryRequest request : requests) {
+            CvWorkExperienceEntry entry = new CvWorkExperienceEntry(cv, request.employer(), request.jobTitle());
+            entry.setLocation(request.location());
+            entry.setStartDate(request.startDate());
+            entry.setEndDate(request.endDate());
+            entry.setDescription(request.description());
+            entry.setDisplayOrder(request.displayOrder());
+            cv.getWorkExperienceEntries().add(entry);
+        }
     }
 
-    private String escapeHtml(String value) {
-        return value
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\"", "&quot;")
-            .replace("'", "&#39;");
+    private void replaceSkills(Cv cv, List<CvSkillRequest> requests) {
+        cv.getSkills().clear();
+        for (CvSkillRequest request : requests) {
+            CvSkill skill = new CvSkill(cv, request.name());
+            skill.setCategory(request.category());
+            skill.setProficiency(request.proficiency());
+            skill.setDisplayOrder(request.displayOrder());
+            cv.getSkills().add(skill);
+        }
+    }
+
+    private void replaceLanguages(Cv cv, List<CvLanguageRequest> requests) {
+        cv.getLanguages().clear();
+        for (CvLanguageRequest request : requests) {
+            CvLanguage language = new CvLanguage(cv, request.name());
+            language.setProficiency(request.proficiency());
+            language.setDisplayOrder(request.displayOrder());
+            cv.getLanguages().add(language);
+        }
+    }
+
+    private void replaceLinks(Cv cv, List<CvLinkRequest> requests) {
+        cv.getLinks().clear();
+        for (CvLinkRequest request : requests) {
+            CvLink link = new CvLink(cv, request.label(), request.url());
+            link.setDisplayOrder(request.displayOrder());
+            cv.getLinks().add(link);
+        }
     }
 }

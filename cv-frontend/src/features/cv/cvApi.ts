@@ -15,6 +15,7 @@ export type Cv = {
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
+  deletedAt: string | null;
 };
 
 export type CvPersonalDetails = {
@@ -86,6 +87,10 @@ export function listCvs() {
   return apiRequest<Cv[]>('/api/cvs');
 }
 
+export function listArchivedCvs() {
+  return apiRequest<Cv[]>('/api/cvs/archived');
+}
+
 export function searchCvs(query: string) {
   return apiRequest<Cv[]>(`/api/cvs/search?q=${encodeURIComponent(query)}`);
 }
@@ -120,6 +125,18 @@ export function updateCv(id: number | string, request: CvUpdateRequest) {
 }
 
 export function archiveCv(id: number | string) {
+  return apiRequest<void>(`/api/cvs/${id}/archive`, {
+    method: 'POST'
+  });
+}
+
+export function unarchiveCv(id: number | string) {
+  return apiRequest<void>(`/api/cvs/${id}/unarchive`, {
+    method: 'POST'
+  });
+}
+
+export function softDeleteCv(id: number | string) {
   return apiRequest<void>(`/api/cvs/${id}`, {
     method: 'DELETE'
   });

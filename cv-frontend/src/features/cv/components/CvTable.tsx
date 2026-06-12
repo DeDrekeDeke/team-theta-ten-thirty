@@ -4,9 +4,10 @@ import { Cv } from '../cvApi';
 
 type CvTableProps = {
   cvs: Cv[];
+  renderActions?: (cv: Cv) => React.ReactNode;
 };
 
-export function CvTable({ cvs }: CvTableProps) {
+export function CvTable({ cvs, renderActions }: CvTableProps) {
   if (cvs.length === 0) {
     return <p className="muted">No CVs found.</p>;
   }
@@ -20,6 +21,7 @@ export function CvTable({ cvs }: CvTableProps) {
             <th>Owner</th>
             <th>Summary</th>
             <th>Updated</th>
+            {renderActions ? <th>Actions</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -31,6 +33,7 @@ export function CvTable({ cvs }: CvTableProps) {
               <td>{cv.ownerEmail}</td>
               <td>{cv.summary || 'No summary'}</td>
               <td>{formatDateTime(cv.updatedAt)}</td>
+              {renderActions ? <td>{renderActions(cv)}</td> : null}
             </tr>
           ))}
         </tbody>

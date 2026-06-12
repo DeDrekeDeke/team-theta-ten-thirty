@@ -7,7 +7,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { AiActionPanel } from '../ai/AiActionPanel';
 import { getCurrentUser } from '../auth/authStore';
 import { CvPreview } from './components/CvPreview';
-import { archiveCv, Cv, getCv } from './cvApi';
+import { archiveCv, Cv, getCv, softDeleteCv } from './cvApi';
 
 export function CvDetailPage() {
   const { id } = useParams();
@@ -15,6 +15,7 @@ export function CvDetailPage() {
   const [cv, setCv] = useState<Cv | null>(null);
   const [error, setError] = useState('');
   const [archiving, setArchiving] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -48,10 +49,27 @@ export function CvDetailPage() {
 
     try {
       await archiveCv(cv.id);
-      navigate('/');
+      navigate('/', { state: { notice: `${cv.title} was archived.` } });
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'Could not archive CV');
       setArchiving(false);
+    }
+  }
+
+  async function handleSoftDelete() {
+    if (!cv) {
+      return;
+    }
+
+    setRemoving(true);
+    setError('');
+
+    try {
+      await softDeleteCv(cv.id);
+      navigate('/', { state: { notice: `${cv.title} was removed.` } });
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'Could not remove CV');
+      setRemoving(false);
     }
   }
 
@@ -88,6 +106,9 @@ export function CvDetailPage() {
           <AiActionPanel cvId={cv.id} />
           <Button type="button" variant="secondary" disabled={archiving} onClick={handleArchive}>
             {archiving ? 'Archiving...' : 'Archive CV'}
+          </Button>
+          <Button type="button" variant="secondary" disabled={removing} onClick={handleSoftDelete}>
+            {removing ? 'Removing...' : 'Remove CV'}
           </Button>
         </div>
       </div>

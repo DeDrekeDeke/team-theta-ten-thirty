@@ -1,25 +1,38 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { ErrorMessage } from '../../components/ErrorMessage';
 import { LoadingState } from '../../components/LoadingState';
 import { PageHeader } from '../../components/PageHeader';
 import { CvTable } from './components/CvTable';
-import { Cv, listCvs, searchCvs } from './cvApi';
+import { archiveCv, Cv, listCvs, searchCvs, softDeleteCv } from './cvApi';
+
+type LocationState = {
+  notice?: string;
+};
 
 export function CvListPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [cvs, setCvs] = useState<Cv[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
+    const state = location.state as LocationState | null;
+    if (state?.notice) {
+      setNotice(state.notice);
+      navigate(location.pathname, { replace: true, state: null });
+    }
     loadCvs();
   }, []);
 
   async function loadCvs() {
     setLoading(true);
     setError('');
+    setNotice('');
     try {
       setCvs(await listCvs());
     } catch (exception) {
@@ -33,12 +46,37 @@ export function CvListPage() {
     event.preventDefault();
     setLoading(true);
     setError('');
+    setNotice('');
     try {
       setCvs(query.trim() ? await searchCvs(query) : await listCvs());
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'Search failed');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleArchive(cv: Cv) {
+    setError('');
+    setNotice('');
+    try {
+      await archiveCv(cv.id);
+      setCvs((currentCvs) => currentCvs.filter((item) => item.id !== cv.id));
+      setNotice(`${cv.title} was archived.`);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'Could not archive CV');
+    }
+  }
+
+  async function handleSoftDelete(cv: Cv) {
+    setError('');
+    setNotice('');
+    try {
+      await softDeleteCv(cv.id);
+      setCvs((currentCvs) => currentCvs.filter((item) => item.id !== cv.id));
+      setNotice(`${cv.title} was removed.`);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'Could not remove CV');
     }
   }
 
@@ -62,8 +100,25 @@ export function CvListPage() {
         </Button>
       </form>
 
+      {notice ? <p className="notice-message">{notice}</p> : null}
       {error ? <ErrorMessage message={error} /> : null}
-      {loading ? <LoadingState /> : <CvTable cvs={cvs} />}
+      {loading ? (
+        <LoadingState />
+      ) : (
+        <CvTable
+          cvs={cvs}
+          renderActions={(cv) => (
+            <div className="row-actions">
+              <Button type="button" variant="secondary" onClick={() => handleArchive(cv)}>
+                Archive
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => handleSoftDelete(cv)}>
+                Remove
+              </Button>
+            </div>
+          )}
+        />
+      )}
     </section>
   );
 }

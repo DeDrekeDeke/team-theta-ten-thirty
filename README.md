@@ -117,6 +117,20 @@ http://localhost:5173
 The frontend calls the backend at `http://localhost:8080` by default. Override
 that with `VITE_API_BASE_URL` if needed.
 
+For GitHub Pages, the backend cannot be `localhost`. GitHub Pages hosts only
+the static frontend, so deploy the Spring Boot backend separately and build the
+frontend with the deployed backend origin:
+
+```powershell
+cd cv-frontend
+$env:VITE_API_BASE_URL = "https://your-backend-host.example.com"
+npm run deploy
+```
+
+Use the backend origin only, without `/api`; the frontend adds API paths like
+`/api/auth/login` itself. The backend CORS configuration must allow the Pages
+origin `https://dedrekedeke.github.io`.
+
 ## Demo Users
 
 ```text

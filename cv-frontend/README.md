@@ -29,6 +29,21 @@ Override it with:
 VITE_API_BASE_URL=http://localhost:8080
 ```
 
+## GitHub Pages
+
+GitHub Pages serves only the built frontend. It cannot run the Spring Boot
+backend, and `localhost` in a deployed page points to the visitor's computer.
+
+Deploy the backend somewhere else, then build and publish the frontend with the
+backend origin:
+
+```powershell
+$env:VITE_API_BASE_URL = "https://your-backend-host.example.com"
+npm run deploy
+```
+
+Do not include `/api` in `VITE_API_BASE_URL`; request paths already include it.
+
 ## Authentication Notes
 
 - The frontend keeps the authenticated user and bearer token in memory only for the current browser tab.

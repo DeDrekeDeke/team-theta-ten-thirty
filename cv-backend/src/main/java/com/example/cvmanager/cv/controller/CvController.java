@@ -32,6 +32,11 @@ public class CvController {
         return cvService.listCvs(user);
     }
 
+    @GetMapping("/archived")
+    public List<CvResponse> listArchivedCvs(@AuthenticationPrincipal AuthenticatedUser user) {
+        return cvService.listArchivedCvs(user);
+    }
+
     @GetMapping("/search")
     public List<CvResponse> searchCvs(
             @AuthenticationPrincipal AuthenticatedUser user,
@@ -93,9 +98,25 @@ public class CvController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void softDeleteCv(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long id) {
+        cvService.softDeleteCv(user, id);
+    }
+
+    @PostMapping("/{id}/archive")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void archiveCv(
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable Long id) {
         cvService.archiveCv(user, id);
+    }
+
+    @PostMapping("/{id}/unarchive")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void unarchiveCv(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long id) {
+        cvService.unarchiveCv(user, id);
     }
 }

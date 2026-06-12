@@ -28,10 +28,6 @@ public class Cv {
     @Setter
     private String title;
 
-//    @Column(name = "uploaded_html_file_path", nullable = false, length = 500)
-//    @Setter
-//    private String uploadedHtmlFilePath;
-
     @Column(name = "summary", columnDefinition = "text")
     @Setter
     private String summary;
@@ -44,6 +40,9 @@ public class Cv {
 
     @Column(name = "archived_at")
     private LocalDateTime archivedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @OneToOne(mappedBy = "cv", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private CvPersonalDetails personalDetails;
@@ -99,11 +98,24 @@ public class Cv {
         archivedAt = LocalDateTime.now();
     }
 
+    public void unarchive() {
+        archivedAt = null;
+    }
+
     public void restore() {
         archivedAt = null;
+        deletedAt = null;
+    }
+
+    public void softDelete() {
+        deletedAt = LocalDateTime.now();
     }
 
     public boolean isArchived() {
         return archivedAt != null;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 }
